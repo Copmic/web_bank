@@ -26,6 +26,11 @@ Abhängigkeit zu tidy und xpath.
 12.05.2012: Fix des Session-Handlings durch erneute Änderung der DKB (Akzeptieren von
 Cookies ist erforderlich) Danke an Robert Steffens!
 
+22.11.2015: Fix für User-agent --- ('User-agent', 'Mozilla/5.0') --- (DKB fordert den, ohne gibt es urllib2.open Error)
+			Fix für Unicode "Zweck" Strings --- unicode(antwort... )
+			Fix für Webseiten-Pfade nach Änderung von DKB --- "transaction.CreditCard." statt "creditcard."
+			
+
 Benutzung: web_bank.py [OPTIONEN]
 
  -a, --account=ACCOUNT      Kontonummer des Hauptkontos. Angabe notwendig
@@ -80,6 +85,7 @@ class NewParser:
 		url= self.URL+"/dkb/-?$javascript=disabled"
 		cj = cookielib.LWPCookieJar()
 		opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
+		opener.addheaders = [('User-agent', 'Mozilla/5.0')]
 		urllib2.install_opener(opener)
 		page= urllib2.urlopen(url,).read()
 		session= re.findall(';dkbsessid=.*?["\?]',page)[0][:-1]
@@ -102,8 +108,9 @@ class NewParser:
 		url= self.URL+'/dkb/-'
 
 		# init search
-		request=urllib2.Request(url+'?$part=DkbTransactionBanking.content.creditcard.CreditcardTransactionSearch&$event=init',
+		request=urllib2.Request(url+'?$part=DkbTransactionBanking.content.transaction.CreditCard.CreditcardTransactionSearch&$event=init',
 		                        headers={'Referer':urllib.quote_plus(referer)})
+		request.add_header('User-agent', 'Mozilla/5.0')
 		throwaway=urllib2.urlopen(request).read()
 		referer = url
 
@@ -114,9 +121,10 @@ class NewParser:
 		                                                     'postingDate': fromdate,
 		                                                     'toPostingDate': till,
 		                                                     '$$event_search': 'Umsätze+anzeigen',
-		                                                     '$part': 'DkbTransactionBanking.content.creditcard.CreditcardTransactionSearch',
+		                                                     '$part': 'DkbTransactionBanking.content.transaction.CreditCard.CreditcardTransactionSearch',
 		                                                     '$$$event_search': 'search',
 		}), headers={'Referer':urllib.quote_plus(referer)})
+		request.add_header('User-agent', 'Mozilla/5.0')
 		data= ''.join(urllib2.urlopen(request).readlines())
 
 		# find card index
@@ -129,18 +137,22 @@ class NewParser:
 		    	                                                     'postingDate': fromdate,
 		    	                                                     'toPostingDate': till,
 		    	                                                     '$$event_search': 'Umsätze+anzeigen',
-		    	                                                     '$part': 'DkbTransactionBanking.content.creditcard.CreditcardTransactionSearch',
+		    	                                                     '$part': 'DkbTransactionBanking.content.transaction.CreditCard.CreditcardTransactionSearch',
 		    	                                                     '$$$event_search': 'search',
 		    	}), headers={'Referer':urllib.quote_plus(url+"?$part=DkbTransactionBanking.content.banking.FinancialStatus.FinancialStatus&$event=paymentTransaction&row=1&table=cashTable")})
+		    	request.add_header('User-agent', 'Mozilla/5.0')
 		    	throwaway= ''.join(urllib2.urlopen(request).readlines())
 
 
 
 		#CSV abrufen
-		request=urllib2.Request(url+'?$part=DkbTransactionBanking.content.creditcard.CreditcardTransactionSearch&$event=csvExport',
+		request=urllib2.Request(url+'?$part=DkbTransactionBanking.content.transaction.CreditCard.CreditcardTransactionSearch&$event=csvExport',
 		                        headers={'Referer':urllib.quote_plus(url)})
-		antwort= urllib2.urlopen(request).read()
+		request.add_header('User-agent', 'Mozilla/5.0')
+		temp_anfrage = urllib2.urlopen(request)
+		antwort= temp_anfrage.read()
 		log('Daten empfangen. Länge: %s'%len(antwort))
+		antwort = unicode(antwort, temp_anfrage.headers['content-type'].split('charset=')[-1])
 		return antwort
 	   
 	def parse_csv(self, cc_csv):
